@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ViewType, Product, Sale, User, SaleItem, SaleOrigin } from './types.ts';
 import Sidebar from './components/Sidebar.tsx';
 import Dashboard from './components/Dashboard.tsx';
@@ -66,6 +66,12 @@ const App: React.FC = () => {
     }
   }, [isInitialized, user, currentView, products, sales]);
 
+  const handleLogout = useCallback(() => {
+    StorageService.clearSession();
+    setUser(null);
+    setCurrentView('dashboard');
+  }, []);
+
   const handleAddProduct = (pData: Omit<Product, 'id' | 'lastUpdate'>) => {
     const newProduct: Product = {
       ...pData,
@@ -122,12 +128,6 @@ const App: React.FC = () => {
     StorageService.saveSales(newSales);
     StorageService.saveProducts(updatedProducts);
     setCurrentView('history');
-  };
-
-  const handleLogout = () => {
-    StorageService.clearSession();
-    setUser(null);
-    setCurrentView('dashboard');
   };
 
   if (!isInitialized) return null;
