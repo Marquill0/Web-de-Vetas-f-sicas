@@ -1,17 +1,17 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { ViewType, Product, Sale, User, ActivityLog, SaleItem, PaymentMethod, SaleOrigin } from './types';
-import Sidebar from './components/Sidebar';
-import Dashboard from './components/Dashboard';
-import Inventory from './components/Inventory';
-import NewSale from './components/NewSale';
-import Reports from './components/Reports';
-import Settings from './components/Settings';
-import Login from './components/Login';
-import { StorageService } from './services/storage';
-import { INITIAL_PRODUCTS, INITIAL_USER, PAYMENT_METHODS } from './constants';
-import { getInventoryInsights } from './services/geminiService';
-import { Bell, Search, User as UserIcon, LogOut } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ViewType, Product, Sale, User, SaleItem, SaleOrigin } from './types.ts';
+import Sidebar from './components/Sidebar.tsx';
+import Dashboard from './components/Dashboard.tsx';
+import Inventory from './components/Inventory.tsx';
+import NewSale from './components/NewSale.tsx';
+import Reports from './components/Reports.tsx';
+import Settings from './components/Settings.tsx';
+import Login from './components/Login.tsx';
+import { StorageService } from './services/storage.ts';
+import { INITIAL_PRODUCTS, PAYMENT_METHODS } from './constants.tsx';
+import { getInventoryInsights } from './services/geminiService.ts';
+import { Bell, Search, User as UserIcon } from 'lucide-react';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -23,7 +23,6 @@ const App: React.FC = () => {
   const [insights, setInsights] = useState<{ title: string; description: string }[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Initialize data
   useEffect(() => {
     const session = StorageService.getSession();
     const savedProducts = StorageService.getProducts();
@@ -39,7 +38,6 @@ const App: React.FC = () => {
 
     setSales(savedSales);
     
-    // Payment methods initialization
     if (!savedPaymentMethods) {
       StorageService.savePaymentMethods(PAYMENT_METHODS);
       setPaymentMethods(PAYMENT_METHODS);
@@ -54,12 +52,15 @@ const App: React.FC = () => {
     setIsInitialized(true);
   }, []);
 
-  // AI Insights loading
   useEffect(() => {
     if (isInitialized && user && currentView === 'dashboard') {
       const fetchInsights = async () => {
-        const aiInsights = await getInventoryInsights(products, sales);
-        setInsights(aiInsights);
+        try {
+          const aiInsights = await getInventoryInsights(products, sales);
+          setInsights(aiInsights);
+        } catch (e) {
+          console.error("Error fetching insights", e);
+        }
       };
       fetchInsights();
     }
@@ -103,7 +104,6 @@ const App: React.FC = () => {
       sellerId: user?.id || 'sys'
     };
 
-    // Update inventory
     const updatedProducts = [...products];
     items.forEach(item => {
       const pIdx = updatedProducts.findIndex(p => p.id === item.productId);
@@ -121,52 +121,14 @@ const App: React.FC = () => {
     setProducts(updatedProducts);
     StorageService.saveSales(newSales);
     StorageService.saveProducts(updatedProducts);
-    
     setCurrentView('history');
   };
 
-  const handleUpdatePaymentMethods = (methods: string[]) => {
-    setPaymentMethods(methods);
-    StorageService.savePaymentMethods(methods);
-  };
-
-  const handleClearData = () => {
-    if (!confirm('¿Seguro que desea borrar todos los productos y ventas? Esta acción no se puede deshacer.')) return;
-    StorageService.clearAll();
-    setProducts(INITIAL_PRODUCTS);
-    setSales([]);
-    StorageService.saveProducts(INITIAL_PRODUCTS);
-    StorageService.saveSales([]);
-    alert('Datos de prueba borrados. El sistema ha vuelto a su estado inicial.');
-  };
-
-  const handleExportSales = () => {
-    const headers = ['ID Venta', 'Fecha', 'Total', 'Método Pago', 'Origen', 'Cliente', 'Estado'];
-    const rows = sales.map(s => [
-      s.id,
-      new Date(s.date).toLocaleString(),
-      s.total,
-      s.paymentMethod,
-      s.origin,
-      s.client || 'N/A',
-      s.status
-    ]);
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "reporte_ventas.csv");
-    document.body.appendChild(link);
-    link.click();
-  };
-
-  // Se elimina el confirm() para evitar bloqueos del navegador y asegurar que funcione al primer clic
-  const handleLogout = useCallback(() => {
+  const handleLogout = () => {
     StorageService.clearSession();
     setUser(null);
     setCurrentView('dashboard');
-  }, []);
+  };
 
   if (!isInitialized) return null;
 
@@ -205,7 +167,7 @@ const App: React.FC = () => {
             <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>
             <div className="flex items-center gap-3 pl-2 group cursor-pointer" onClick={() => setCurrentView('settings')}>
               <div className="text-right hidden sm:block">
-                <div className="text-sm font-bold text-slate-800 leading-none group-hover:text-emerald-600 transition-colors">{user.name}</div>
+                <div className="text-sm font-bold text-slate-800 group-hover:text-emerald-600 transition-colors">{user.name}</div>
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{user.role}</div>
               </div>
               <div className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-500 shadow-inner group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-all">
@@ -261,9 +223,22 @@ const App: React.FC = () => {
           {currentView === 'settings' && (
             <Settings 
               paymentMethods={paymentMethods} 
-              setPaymentMethods={handleUpdatePaymentMethods} 
-              onClearData={handleClearData} 
-              onExportSales={handleExportSales}
+              setPaymentMethods={(m) => { setPaymentMethods(m); StorageService.savePaymentMethods(m); }} 
+              onClearData={() => {
+                if(confirm('¿Borrar todo?')) {
+                  StorageService.clearAll();
+                  setProducts(INITIAL_PRODUCTS);
+                  setSales([]);
+                  StorageService.saveProducts(INITIAL_PRODUCTS);
+                }
+              }} 
+              onExportSales={() => {
+                const csv = "ID,Total\n" + sales.map(s => `${s.id},${s.total}`).join("\n");
+                const link = document.createElement("a");
+                link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
+                link.download = 'ventas.csv';
+                link.click();
+              }}
             />
           )}
         </main>
