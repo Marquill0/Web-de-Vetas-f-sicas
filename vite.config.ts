@@ -2,8 +2,8 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  // El 'base' debe coincidir con el nombre de tu repositorio en GitHub
-  base: '/Web-de-Vetas-f-sicas/',
+  // Base debe ser el nombre exacto de la carpeta en GitHub Pages
+  base: './', 
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
